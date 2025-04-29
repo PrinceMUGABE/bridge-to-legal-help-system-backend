@@ -83,7 +83,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(default=now)
 
     USERNAME_FIELD = 'phone_number'
-    REQUIRED_FIELDS = ['email']  # email is required for admin user, but not for customer.
+    REQUIRED_FIELDS = ['email']
 
     objects = CustomUserManager()
 
