@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .serializers import SpecializationSerializer
-from rest_framework.status import status
+from rest_framework import status, permissions
 from .models import Specialization
 
 @api_view(['POST'])
