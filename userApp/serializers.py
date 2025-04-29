@@ -8,8 +8,16 @@ from django.contrib.auth import authenticate
 from rest_framework import serializers
 
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'phone_number', 'email', 'role', 'created_at']
+
+
 class ContactUsSerializer(serializers.Serializer):
     names = serializers.CharField(max_length=100, required=True)
     email = serializers.EmailField(required=True)
     subject = serializers.CharField(max_length=255, required=True)
     description = serializers.CharField(required=True)
+    
+    
