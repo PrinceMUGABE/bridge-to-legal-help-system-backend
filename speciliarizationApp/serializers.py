@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'phone_number', 'email', 'role', 'created_at']
 
 class SpecializationSerializer(serializers.ModelSerializer):
-    created_by = serializers.SerializerMethodField()
+    created_by = UserSerializer(read_only=True)
     
     class Meta:
         model = Specialization
