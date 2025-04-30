@@ -8,6 +8,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('userApp.urls')),
     path('specialization/', include('speciliarizationApp.urls')),
+    path('lawyer/', include('professionalApp.urls')),
 ]
 
 if settings.DEBUG:

@@ -71,6 +71,9 @@ class Lawyer(models.Model):
     diploma = models.FileField(upload_to='lawyer_diplomas/', blank=True, null=True)
     years_of_experience = models.PositiveIntegerField(default=0)
     bio = models.TextField(blank=True, null=True)
+    national_id_number = models.CharField(max_length=50, unique=True)
+    national_id_card = models.ImageField(upload_to='lawyer_national_cards/', blank=True, null=True)
+    
     
     # Status fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

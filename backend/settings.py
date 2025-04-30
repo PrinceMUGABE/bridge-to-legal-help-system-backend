@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'userApp',
     'rest_framework_simplejwt',
     'speciliarizationApp',
+    'professionalApp',
  
    
 ]

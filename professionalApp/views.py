@@ -10,6 +10,74 @@ from django.http import Http404
 from .models import Lawyer
 from .serializers import LawyerSerializer
 from userApp.models import CustomUser
+import random
+import string
+import re
+from django.core.mail import send_mail
+from userApp.models import CustomUser
+from django.contrib.auth.hashers import make_password
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.utils.timezone import now
+
+def is_valid_password(password):
+    """Validate password complexity."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters long."
+    if not any(char.isdigit() for char in password):
+        return "Password must include at least one number."
+    if not any(char.isupper() for char in password):
+        return "Password must include at least one uppercase letter."
+    if not any(char.islower() for char in password):
+        return "Password must include at least one lowercase letter."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return "Password must include at least one special character (!@#$%^&* etc.)."
+    return None
+
+
+
+
+def is_valid_email(email):
+    """Validate email format and domain."""
+    email_regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+
+    # Check format
+    if not re.match(email_regex, email):
+        return "Invalid email format."
+
+
+
+    #check if entered password has been used before
+    if not email.endswith("@gmail.com"):
+        return "Only Gmail addresses are allowed for registration."
+
+    return None
+
+
+
+def generate_secure_password():
+    """Generate a secure random password that meets complexity requirements."""
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    special_chars = "!@#$%^&*(),.?\":{}|<>"
+    
+    # Ensure at least one of each required character type
+    password = [
+        random.choice(lowercase),
+        random.choice(uppercase),
+        random.choice(digits),
+        random.choice(special_chars)
+    ]
+    
+    # Fill remaining length with random characters from all types
+    all_chars = lowercase + uppercase + digits + special_chars
+    password.extend(random.choice(all_chars) for _ in range(4))  # 4 more chars to make it 8 total
+    
+    # Shuffle the password characters
+    random.shuffle(password)
+    return ''.join(password)
 
 
 @api_view(['POST'])
@@ -18,75 +86,186 @@ def create_lawyer(request):
     """
     Create a new lawyer profile with all validations in the view
     """
+    
+    print(f"Submitted Data: {request.data}\n")
+    
     try:
-        # Validate required fields
-        if not request.data.get('first_name'):
-            return Response({
-                'status': 'error',
-                'message': 'Validation error',
-                'errors': {'first_name': 'First name is required'}
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if not request.data.get('last_name'):
-            return Response({
-                'status': 'error',
-                'message': 'Validation error',
-                'errors': {'last_name': 'Last name is required'}
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate user_id
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response({
-                'status': 'error',
-                'message': 'Validation error',
-                'errors': {'user_id': 'User is required'}
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check that the user exists and is a lawyer
+        # Validate input data presence
+        if not request.data:
+            print("Error: No data submitted")
+            return Response(
+                {"error": "No data submitted. Please provide information."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Extract and validate required fields
         try:
-            user = CustomUser.objects.get(id=user_id)
-            if user.role != 'lawyer':
-                return Response({
-                    'status': 'error',
-                    'message': 'Validation error',
-                    'errors': {'user_id': "User must have the 'lawyer' role"}
-                }, status=status.HTTP_400_BAD_REQUEST)
+            phone_number = request.data.get('phone_number', '').strip()
+            email = request.data.get('email', '').strip()
+            national_id = request.data.get('national_id', '').strip()
+            national_id_image = request.FILES.get('national_id_image')
+            diploma = request.FILES.get('diploma')
+            first_name = request.data.get('first_name', '').strip()
+            last_name = request.data.get('last_name', '').strip()
+            middle_name = request.data.get('middle_name', '').strip()
+            gender = request.data.get('gender', 'other').strip()
+            residence = request.data.get('residence', '').strip()
+            availability_status = request.data.get('availability_status', 'inactive').strip()
+            marital_status = request.data.get('marital_status', 'single').strip()
+            education_level = request.data.get('education_level', 'bachelor').strip()
+            years_of_experience = request.data.get('years_of_experience', 0)
+            residence_district = request.data.get('residence_district', '').strip()
+            residence_sector = request.data.get('residence_sector', '').strip()
+            bio = request.data.get('bio', '').strip()
+        except Exception as e:
+            print(f"Error extracting fields: {str(e)}")
+            return Response(
+                {"error": f"Error processing input data: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Comprehensive validation
+        validation_errors = []
+
+        # Phone number validation
+        if not phone_number:
+            validation_errors.append("Phone number is required")
+        elif not phone_number.startswith('0') or len(''.join(filter(str.isdigit, phone_number))) != 10:
+            validation_errors.append("Phone number must be 10 digits long and start with 0")
+
+        # Email validation
+        if not email:
+            validation_errors.append("Email is required")
+        else:
+            try:
+                validate_email(email)
                 
-            # Check if this user already has a lawyer profile
-            if Lawyer.objects.filter(user_id=user_id).exists():
-                return Response({
-                    'status': 'error',
-                    'message': 'Validation error',
-                    'errors': {'user_id': "This user already has a lawyer profile"}
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except CustomUser.DoesNotExist:
-            return Response({
-                'status': 'error',
-                'message': 'Validation error',
-                'errors': {'user_id': "User with this ID does not exist"}
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
+                # Additional email validation
+                email_error = is_valid_email(email)
+                if email_error:
+                    validation_errors.append(email_error)
+            except ValidationError:
+                validation_errors.append("Invalid email format")
+
+        # Check for existing user with same phone number or email
+        existing_user_phone = CustomUser.objects.filter(phone_number=phone_number).exists()
+        if existing_user_phone:
+            validation_errors.append("Phone number already registered")
+
+        existing_user_email = CustomUser.objects.filter(email=email).exists()
+        if existing_user_email:
+            validation_errors.append("Email already registered")
+
+        # National ID validation
+        if not national_id:
+            validation_errors.append("National ID number is required")
+        elif not national_id.isdigit() or len(national_id) != 16:
+            validation_errors.append("National ID must be 16 digits long")
+        
+        # Check if national ID is already used
+        if Lawyer.objects.filter(national_id=national_id).exists():
+            validation_errors.append("National ID already registered")
+
+        # National ID image file validation
+        if not national_id_image:
+            validation_errors.append("National ID card file is required")
+        else:
+            if not isinstance(national_id_image, InMemoryUploadedFile):
+                validation_errors.append("Invalid national ID card file")
+            elif national_id_image.size > 5 * 1024 * 1024:
+                validation_errors.append("National ID card file too large. Max 5MB allowed.")
+            elif national_id_image.content_type != 'application/pdf':
+                validation_errors.append("National ID card must be a PDF file")
+
+        # Diploma file validation
+        if not diploma:
+            validation_errors.append("Diploma file is required")
+        else:
+            if not isinstance(diploma, InMemoryUploadedFile):
+                validation_errors.append("Invalid diploma file")
+            elif diploma.size > 5 * 1024 * 1024:
+                validation_errors.append("Diploma file too large. Max 5MB allowed.")
+            elif diploma.content_type != 'application/pdf':
+                validation_errors.append("Diploma must be a PDF file")
+
+        # Return validation errors if any
+        if validation_errors:
+            print("Validation Errors:", validation_errors)
+            return Response(
+                {"errors": validation_errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Use transaction to ensure database consistency
         with transaction.atomic():
-            # Extract data for Lawyer model (excluding user_id)
-            lawyer_data = {k: v for k, v in request.data.items() if k != 'user_id'}
+            # Generate a temporary password
+            temp_password = generate_secure_password()
             
-            # Create lawyer instance
-            lawyer = Lawyer(
-                user=user,
-                created_by=request.user,
-                **lawyer_data
+            # Create user with lawyer role
+            user = CustomUser.objects.create_user(
+                phone_number=phone_number,
+                email=email,
+                role='lawyer', 
+                password=temp_password
             )
-            lawyer.save()
             
-            # Return the created lawyer data
-            serializer = LawyerSerializer(lawyer)
-            return Response({
-                'status': 'success',
-                'message': 'Lawyer profile created successfully',
-                'data': serializer.data
-            }, status=status.HTTP_201_CREATED)
+            # Create lawyer profile
+            lawyer = Lawyer.objects.create(
+                user=user,
+                first_name=first_name,
+                middle_name=middle_name,
+                last_name=last_name,
+                gender=gender,
+                marital_status=marital_status,
+                residence_district=residence_district,
+                residence_sector=residence_sector,
+                availability_status=availability_status,
+                education_level=education_level,
+                years_of_experience=years_of_experience,
+                national_id=national_id,  # Fixed: Match field name with model
+                national_id_image=national_id_image,  # Fixed: Match field name with model
+                diploma=diploma,
+                bio=bio,
+                created_by=request.user,
+                status='pending',
+                created_at=now(),
+                updated_at=now()
+            )
+            
+            # Send the password to the user's email if email is provided
+            if email:
+                message = (
+                    f"Hello, {first_name} {last_name}\n\n"
+                    f"You have been added to the Bridge to Legal Help System (BLHS).\n"
+                    f"Your password is: {temp_password}\n\n"
+                    "This is a system-generated password. Please change it after your first login."
+                )
+                
+                send_mail(
+                    subject="Welcome to Bridge to Legal Help System",
+                    message=message,
+                    from_email="no-reply@blhs.com",
+                    recipient_list=[email],
+                )
+                
+            # Prepare response data
+            response_data = {
+                'id': lawyer.id,
+                'first_name': lawyer.first_name,
+                'last_name': lawyer.last_name,
+                'status': lawyer.status,
+                'availability_status': lawyer.availability_status,
+                'residence_district': lawyer.residence_district,
+                'residence_sector': lawyer.residence_sector,
+                'years_of_experience': lawyer.years_of_experience,
+                'created_at': lawyer.created_at,
+                'updated_at': lawyer.updated_at,
+                'created_by': lawyer.created_by.phone_number if lawyer.created_by else None,
+                'national_id': lawyer.national_id
+            }
+            
+            print("Lawyer created successfully")
+            return Response(response_data, status=status.HTTP_201_CREATED)
             
     except IntegrityError as e:
         return Response({
@@ -100,8 +279,9 @@ def create_lawyer(request):
             'message': 'An unexpected error occurred',
             'errors': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
+        
+        
+        
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_lawyer_by_id(request, lawyer_id):

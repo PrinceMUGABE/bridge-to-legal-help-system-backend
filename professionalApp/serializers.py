@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Lawyer
 from userApp.models import CustomUser
-from userApp.serializers import CustomUserSerializer
 from speciliarizationApp.models import Specialization
 
 class UserSerializer(serializers.ModelSerializer):
