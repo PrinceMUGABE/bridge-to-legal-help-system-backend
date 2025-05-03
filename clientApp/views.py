@@ -18,58 +18,74 @@ def create_client(request):
     """
     Create a new client profile
     """
-    # Check if the user has permission to create clients
-    if not request.user.has_perm('client.add_client'):
-        return Response(
-            {"error": "You don't have permission to create clients"},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
     try:
         with transaction.atomic():
-            # Extract user_id from request data
-            user_id = request.user
-            if not user_id:
-                return Response(
-                    {"error": "User ID is required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Get the current logged-in user
+            user = request.user
+            submitted_user_id = request.data.get('user_id')
             
-            # Check if user exists and has customer role
-            try:
-                user = CustomUser.objects.get(id=user_id)
-                if user.role != 'customer':
-                    return Response(
-                        {"error": "Only 'customer' user is allowed to create a client profile"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            except CustomUser.DoesNotExist:
+            if user:
+                print(f"User ID: {user.id},\n User role: {user.role}\n")
+                
+            if submitted_user_id:
+                print(f"Submitted User ID: {submitted_user_id}\n User role: {submitted_user_id.role}\n")
+            else:
+                print("No submitted user ID provided.\n")
+            
+           
+            
+            # Check if user has customer role
+            if user.role != 'customer' and user.role !='admin':
                 return Response(
-                    {"error": f"User with ID {user_id} does not exist"},
-                    status=status.HTTP_404_NOT_FOUND
+                    {"error": "Only users with 'admin or customer' role can create a client profile"},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
             
             # Check if the user already has a client profile
-            if Client.objects.filter(user=user).exists():
-                return Response(
-                    {"error": "This user already has a client profile"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            if user:
+                existing_client = Client.objects.filter(user=user).first()
+                if existing_client:
+                    return Response(
+                        {"error": "You already have a client profile"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            elif submitted_user_id:
+                # Check if the submitted user ID exists and is a customer
+                try:
+                    user = CustomUser.objects.get(id=submitted_user_id, role='customer')
+                    print(f"User ID: {user.id.role}, \n Submitted User ID: {submitted_user_id.role}")
+                    existing_client = Client.objects.filter(user=user).first()
+                    if existing_client:
+                        return Response(
+                            {"error": "This user already has a client profile"},
+                            status=status.HTTP_400_BAD_REQUEST)
+                except CustomUser.DoesNotExist:
+                    return Response(
+                        {"error": "User with this ID does not exist or is not a customer"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 
             # Validate national ID uniqueness
             national_id = request.data.get('national_id')
+            if not national_id:
+                return Response(
+                    {"error": "National ID is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
             if Client.objects.filter(national_id=national_id).exists():
                 return Response(
                     {"error": "This national ID is already registered"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Create client data dict and add user and created_by fields
+            # Create client data dict
             client_data = request.data.copy()
-            client_data['user'] = user.id
             
+            # Create serializer instance with data and validate
             serializer = ClientSerializer(data=client_data)
             if serializer.is_valid():
+                # Save the client with the current user
                 serializer.save(user=user)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -82,7 +98,6 @@ def create_client(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_all_clients(request):
@@ -90,7 +105,7 @@ def get_all_clients(request):
     Get all clients with filtering options
     """
     # Check if the user has permission to view clients
-    if not request.user.has_perm('client.view_client'):
+    if not request.user:
         return Response(
             {"error": "You don't have permission to view clients"},
             status=status.HTTP_403_FORBIDDEN
@@ -137,7 +152,7 @@ def get_client_by_id(request, client_id):
     Get a specific client by ID
     """
     # Check if the user has permission to view clients
-    if not request.user.has_perm('client.view_client'):
+    if not request.user:
         return Response(
             {"error": "You don't have permission to view client details"},
             status=status.HTTP_403_FORBIDDEN
@@ -187,7 +202,7 @@ def update_client(request, client_id):
     Update a client's information
     """
     # Check if the user has permission to update clients
-    if not request.user.has_perm('client.change_client'):
+    if not request.user:
         return Response(
             {"error": "You don't have permission to update client information"},
             status=status.HTTP_403_FORBIDDEN
@@ -230,7 +245,7 @@ def delete_client(request, client_id):
     Delete a client
     """
     # Check if the user has permission to delete clients
-    if not request.user.has_perm('client.delete_client'):
+    if not request.user:
         return Response(
             {"error": "You don't have permission to delete clients"},
             status=status.HTTP_403_FORBIDDEN
