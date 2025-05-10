@@ -107,3 +107,7 @@ class Lawyer(models.Model):
         if not self.pk:
             self.status = 'pending'
         super().save(*args, **kwargs)
+        
+
+
+

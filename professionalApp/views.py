@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.db import IntegrityError, transaction
@@ -20,6 +20,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.timezone import now
+from speciliarizationApp.models import Specialization
 
 def is_valid_password(password):
     """Validate password complexity."""
@@ -103,13 +104,12 @@ def create_lawyer(request):
             phone_number = request.data.get('phone_number', '').strip()
             email = request.data.get('email', '').strip()
             national_id = request.data.get('national_id', '').strip()
-            national_id_image = request.FILES.get('national_id_image')
+            national_id_image = request.FILES.get('national_id_card')
             diploma = request.FILES.get('diploma')
             first_name = request.data.get('first_name', '').strip()
             last_name = request.data.get('last_name', '').strip()
             middle_name = request.data.get('middle_name', '').strip()
             gender = request.data.get('gender', 'other').strip()
-            residence = request.data.get('residence', '').strip()
             availability_status = request.data.get('availability_status', 'inactive').strip()
             marital_status = request.data.get('marital_status', 'single').strip()
             education_level = request.data.get('education_level', 'bachelor').strip()
@@ -117,10 +117,28 @@ def create_lawyer(request):
             residence_district = request.data.get('residence_district', '').strip()
             residence_sector = request.data.get('residence_sector', '').strip()
             bio = request.data.get('bio', '').strip()
+            
+            # FIX: Retrieve specializations as a list (getlist instead of get)
+            # And use the correct field name (specializations - plural)
+            specializations = request.data.getlist('specializations')
+            
+            # Print extracted values for debugging
+            print(f"Extracted Values:")
+            print(f"  Phone: {phone_number}")
+            print(f"  Email: {email}")
+            print(f"  National ID: {national_id}")
+            print(f"  First Name: {first_name}")
+            print(f"  Last Name: {last_name}")
+            print(f"  Files: {request.FILES.keys()}")
+            print(f"  Specializations: {specializations}")  # Updated to print all specializations
+            
         except Exception as e:
-            print(f"Error extracting fields: {str(e)}")
+            error_msg = f"Error extracting fields: {str(e)}"
+            print(error_msg)
+            import traceback
+            print(traceback.format_exc())
             return Response(
-                {"error": f"Error processing input data: {str(e)}"},
+                {"error": error_msg},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -147,6 +165,10 @@ def create_lawyer(request):
             except ValidationError:
                 validation_errors.append("Invalid email format")
 
+        # Specialization validation
+        if not specializations:
+            validation_errors.append("At least one specialization is required")
+
         # Check for existing user with same phone number or email
         existing_user_phone = CustomUser.objects.filter(phone_number=phone_number).exists()
         if existing_user_phone:
@@ -163,7 +185,7 @@ def create_lawyer(request):
             validation_errors.append("National ID must be 16 digits long")
         
         # Check if national ID is already used
-        if Lawyer.objects.filter(national_id=national_id).exists():
+        if Lawyer.objects.filter(national_id_number=national_id).exists():
             validation_errors.append("National ID already registered")
 
         # National ID image file validation
@@ -222,8 +244,8 @@ def create_lawyer(request):
                 availability_status=availability_status,
                 education_level=education_level,
                 years_of_experience=years_of_experience,
-                national_id=national_id,  # Fixed: Match field name with model
-                national_id_image=national_id_image,  # Fixed: Match field name with model
+                national_id_number=national_id,  # Fixed field name to match model
+                national_id_card=national_id_image,
                 diploma=diploma,
                 bio=bio,
                 created_by=request.user,
@@ -231,6 +253,15 @@ def create_lawyer(request):
                 created_at=now(),
                 updated_at=now()
             )
+            
+            # Add specializations to the lawyer
+            if specializations:
+                for spec_id in specializations:
+                    try:
+                        specialization = Specialization.objects.get(pk=int(spec_id))
+                        lawyer.specializations.add(specialization)
+                    except (Specialization.DoesNotExist, ValueError) as e:
+                        print(f"Warning: Could not add specialization {spec_id}: {e}")
             
             # Send the password to the user's email if email is provided
             if email:
@@ -261,122 +292,34 @@ def create_lawyer(request):
                 'created_at': lawyer.created_at,
                 'updated_at': lawyer.updated_at,
                 'created_by': lawyer.created_by.phone_number if lawyer.created_by else None,
-                'national_id': lawyer.national_id
+                'national_id': lawyer.national_id_number,
+                'specializations': list(lawyer.specializations.values('id', 'name')) # Include specializations in response
             }
             
             print("Lawyer created successfully")
             return Response(response_data, status=status.HTTP_201_CREATED)
             
     except IntegrityError as e:
+        error_msg = f"Database integrity error: {str(e)}"
+        print(error_msg)
+        import traceback
+        print(traceback.format_exc())
         return Response({
             'status': 'error',
             'message': 'Database integrity error',
             'errors': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
+        error_msg = f"An unexpected error occurred: {str(e)}"
+        print(error_msg)
+        import traceback
+        print(traceback.format_exc())
         return Response({
             'status': 'error',
             'message': 'An unexpected error occurred',
             'errors': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        
-        
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_lawyer_by_id(request, lawyer_id):
-    """
-    Get lawyer details by ID
-    """
-    try:
-        lawyer = get_object_or_404(Lawyer, id=lawyer_id)
-        serializer = LawyerSerializer(lawyer)
-        
-        return Response({
-            'status': 'success',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
-    
-    except Http404:
-        return Response({
-            'status': 'error',
-            'message': f'Lawyer with ID {lawyer_id} not found'
-        }, status=status.HTTP_404_NOT_FOUND)
-    
-    except Exception as e:
-        return Response({
-            'status': 'error',
-            'message': 'An unexpected error occurred',
-            'errors': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_all_lawyers(request):
-    """
-    Get all lawyers with filtering options
-    """
-    try:
-        # Get query parameters for filtering
-        status_filter = request.query_params.get('status')
-        district = request.query_params.get('district')
-        sector = request.query_params.get('sector')
-        availability = request.query_params.get('availability')
-        
-        # Start with all lawyers
-        lawyers = Lawyer.objects.all()
-        
-        # Apply filters if provided
-        if status_filter:
-            lawyers = lawyers.filter(status=status_filter)
-            
-        if district:
-            lawyers = lawyers.filter(residence_district__icontains=district)
-            
-        if sector:
-            lawyers = lawyers.filter(residence_sector__icontains=sector)
-            
-        if availability:
-            lawyers = lawyers.filter(availability_status=availability)
-        
-        # For list view, select only necessary fields
-        lawyers_list = lawyers.values(
-            'id', 'first_name', 'middle_name', 'last_name',
-            'residence_district', 'residence_sector', 'years_of_experience',
-            'status', 'availability_status'
-        ).select_related('user')
-        
-        # Format the response data with computed fields
-        response_data = []
-        for lawyer in lawyers:
-            middle = f" {lawyer.middle_name}" if lawyer.middle_name else ""
-            full_name = f"{lawyer.first_name}{middle} {lawyer.last_name}"
-            
-            response_data.append({
-                'id': lawyer.id,
-                'full_name': full_name,
-                'user_phone': lawyer.user.phone_number if lawyer.user else None,
-                'residence_district': lawyer.residence_district,
-                'residence_sector': lawyer.residence_sector,
-                'years_of_experience': lawyer.years_of_experience,
-                'status': lawyer.status,
-                'availability_status': lawyer.availability_status
-            })
-        
-        return Response({
-            'status': 'success',
-            'count': len(response_data),
-            'data': response_data
-        }, status=status.HTTP_200_OK)
-    
-    except Exception as e:
-        return Response({
-            'status': 'error',
-            'message': 'An unexpected error occurred',
-            'errors': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
@@ -411,11 +354,66 @@ def update_lawyer(request, lawyer_id):
             
         # Use transaction to ensure database consistency
         with transaction.atomic():
-            # Update fields directly
+            # Handle regular fields update
             for field, value in request.data.items():
-                if hasattr(lawyer, field) and field not in ('user', 'created_at', 'updated_at', 'created_by'):
+                if hasattr(lawyer, field) and field not in ('user', 'created_at', 'updated_at', 'created_by', 
+                                                         'specializations', 'diploma', 'national_id_card'):
                     setattr(lawyer, field, value)
             
+            # Handle specializations update
+            if 'specializations' in request.data:
+                specializations = request.data.getlist('specializations')
+                if specializations:
+                    # Create a list of specialization objects
+                    spec_objects = []
+                    for spec_id in specializations:
+                        try:
+                            specialization = Specialization.objects.get(pk=int(spec_id))
+                            spec_objects.append(specialization)
+                        except (Specialization.DoesNotExist, ValueError) as e:
+                            print(f"Warning: Could not add specialization {spec_id}: {e}")
+                    
+                    # Set the specializations
+                    lawyer.specializations.set(spec_objects)
+            
+            # Handle diploma file upload
+            if 'diploma' in request.FILES:
+                # Delete old file if it exists
+                if lawyer.diploma:
+                    try:
+                        # Get the file path
+                        old_file_path = lawyer.diploma.path
+                        # Delete the file from the filesystem
+                        import os
+                        if os.path.isfile(old_file_path):
+                            os.remove(old_file_path)
+                    except Exception as e:
+                        # Just log the error but continue
+                        print(f"Error deleting old diploma file: {e}")
+                
+                # Set new diploma
+                lawyer.diploma = request.FILES['diploma']
+            
+            # Handle national ID card file upload
+            if 'national_id_card' in request.FILES:
+                # Delete old file if it exists
+                if lawyer.national_id_card:
+                    try:
+                        # Get the file path
+                        old_file_path = lawyer.national_id_card.path
+                        # Delete the file from the filesystem
+                        import os
+                        if os.path.isfile(old_file_path):
+                            os.remove(old_file_path)
+                    except Exception as e:
+                        # Just log the error but continue
+                        print(f"Error deleting old national ID card file: {e}")
+                
+                # Set new national ID card
+                lawyer.national_id_card = request.FILES['national_id_card']
+            
+            # Update the timestamp and save
+            lawyer.updated_at = now()
             lawyer.save()
             
             # Return the updated lawyer data
@@ -433,11 +431,80 @@ def update_lawyer(request, lawyer_id):
         }, status=status.HTTP_404_NOT_FOUND)
     
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({
+            'status': 'error',
+            'message': 'An unexpected error occurred',
+            'errors': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
+               
+        
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_all_lawyers(request):
+    """
+    Get all lawyers using serializer for consistent data formatting
+    """
+    try:
+        # Get all lawyers with their related data
+        lawyers = Lawyer.objects.all()
+
+        # Use the serializer to format the data
+        serializer = LawyerSerializer(lawyers, many=True)
+        
+        print(f"Lawyers retrieved: {serializer.data}\n\n")
+
+        return Response({
+            'status': 'success',
+            'count': len(serializer.data),
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
         return Response({
             'status': 'error',
             'message': 'An unexpected error occurred',
             'errors': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+             
+            
+        
+        
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_lawyer_by_id(request, lawyer_id):
+    """
+    Get lawyer details by ID
+    """
+    try:
+        lawyer = get_object_or_404(Lawyer, id=lawyer_id)
+        serializer = LawyerSerializer(lawyer)
+        
+        return Response({
+            'status': 'success',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    except Http404:
+        return Response({
+            'status': 'error',
+            'message': f'Lawyer with ID {lawyer_id} not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': 'An unexpected error occurred',
+            'errors': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+             
+
 
 
 @api_view(['DELETE'])
@@ -489,13 +556,6 @@ def get_lawyers_created_by_user(request):
     """
     try:
         lawyers = Lawyer.objects.filter(created_by=request.user)
-        
-        # Get query parameters for filtering
-        status_filter = request.query_params.get('status')
-        
-        # Apply filters if provided
-        if status_filter:
-            lawyers = lawyers.filter(status=status_filter)
         
         # Format for list response
         response_data = []
@@ -566,8 +626,8 @@ def get_lawyers_by_residence(request):
     """
     try:
         # Get query parameters
-        district = request.query_params.get('district')
-        sector = request.query_params.get('sector')
+        district = request.data.get('district')
+        sector = request.data.get('sector')
         
         # Validate at least one filter is provided - validation in view
         if not district and not sector:

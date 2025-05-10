@@ -52,6 +52,7 @@ def get_all_specializations(request):
             specializations = specializations.filter(active=active_value)
             
         serializer = SpecializationSerializer(specializations, many=True)
+        
         return Response({
             'status': 'success',
             'count': len(serializer.data),
@@ -67,10 +68,10 @@ def get_all_specializations(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def get_specialization_by_id(request, pk):
+def get_specialization_by_id(request, id):
     """Get a specialization by ID"""
     try:
-        specialization = get_object_or_404(Specialization, pk=pk)
+        specialization = get_object_or_404(Specialization, id=id)
         serializer = SpecializationSerializer(specialization)
         return Response({
             'status': 'success',
@@ -116,10 +117,12 @@ def get_specialization_by_status(request, status):
 
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
-def update_specialization(request, pk):
+def update_specialization(request, id):
     """Update a specialization"""
+    print(f"Submitted data: {request.data}\n\n")
     try:
-        specialization = get_object_or_404(Specialization, pk=pk)
+        
+        specialization = get_object_or_404(Specialization, id=id)
         
         # Optional permission check - only creator or admin can update
         if specialization.created_by != request.user and request.user.role != 'admin':
@@ -163,10 +166,10 @@ def update_specialization(request, pk):
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
-def delete_specialization(request, pk):
+def delete_specialization(request, id):
     """Delete a specialization"""
     try:
-        specialization = get_object_or_404(Specialization, pk=pk)
+        specialization = get_object_or_404(Specialization, id=id)
         
         # Optional permission check - only creator or admin can delete
         if specialization.created_by != request.user and request.user.role != 'admin':

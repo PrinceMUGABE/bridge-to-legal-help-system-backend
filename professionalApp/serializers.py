@@ -24,9 +24,12 @@ class LawyerSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     specializations = SpecializationSerializer(many=True, read_only=True)
     
+    
+    
     # Fields for computed values used in list view
     user_phone = serializers.SerializerMethodField(read_only=True)
     full_name = serializers.SerializerMethodField(read_only=True)
+
     
     class Meta:
         model = Lawyer
@@ -35,6 +38,8 @@ class LawyerSerializer(serializers.ModelSerializer):
     
     def get_user_phone(self, obj):
         return obj.user.phone_number if obj.user else None
+    
+
     
     def get_full_name(self, obj):
         middle = f" {obj.middle_name}" if obj.middle_name else ""
