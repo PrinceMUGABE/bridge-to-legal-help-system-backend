@@ -10,61 +10,158 @@ from django.utils.timezone import now
 from .models import Client
 from .serializers import ClientSerializer
 from userApp.models import CustomUser
+from userApp.views import register_user
+from userApp.serializers import UserSerializer
+import random
+import string
+from django.core.mail import send_mail
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.core.mail import send_mail
+from django.db.utils import IntegrityError
+from .models import CustomUser
+from django.contrib.auth.hashers import make_password
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from .models import CustomUser
+
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.authentication import BasicAuthentication
+from django.contrib.auth.hashers import check_password
+from django.shortcuts import get_object_or_404
+import random
+import string
+
+def generate_secure_password():
+    """Generate a secure random password that meets complexity requirements."""
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    special_chars = "!@#$%^&*(),.?\":{}|<>"
+    
+    # Ensure at least one of each required character type
+    password = [
+        random.choice(lowercase),
+        random.choice(uppercase),
+        random.choice(digits),
+        random.choice(special_chars)
+    ]
+    
+    # Fill remaining length with random characters from all types
+    all_chars = lowercase + uppercase + digits + special_chars
+    password.extend(random.choice(all_chars) for _ in range(4))  # 4 more chars to make it 8 total
+    
+    # Shuffle the password characters
+    random.shuffle(password)
+    return ''.join(password)
+
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_client(request):
     """
-    Create a new client profile
+    Create a new client profile.
+    
+    This function handles three scenarios:
+    1. Customer users creating their own profile
+    2. Admin users creating a new customer user and associated client profile
+    3. Professional users creating a new customer user and associated client profile
     """
     try:
         with transaction.atomic():
             # Get the current logged-in user
             user = request.user
-            submitted_user_id = request.data.get('user_id')
             
-            if user:
-                print(f"User ID: {user.id},\n User role: {user.role}\n")
-                
-            if submitted_user_id:
-                print(f"Submitted User ID: {submitted_user_id}\n User role: {submitted_user_id.role}\n")
-            else:
-                print("No submitted user ID provided.\n")
-            
-           
-            
-            # Check if user has customer role
-            if user.role != 'customer' and user.role !='admin':
+            # Check if user exists and has appropriate role
+            if not user:
                 return Response(
-                    {"error": "Only users with 'admin or customer' role can create a client profile"},
+                    {"error": "You are not logged in"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+                
+            # Check if user has appropriate role
+            if user.role not in ['customer', 'admin', 'professional']:
+                return Response(
+                    {"error": "Only users with 'admin', 'customer', or 'professional' role can create a client profile"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check if the user already has a client profile
-            if user:
+            # Initialize variable to track if admin or professional is creating a new user
+            is_creating_new_user = user.role in ['admin', 'professional']
+            client_user = user  # Default: user creating their own profile
+            
+            # Admin or Professional creating a new user case
+            if is_creating_new_user:
+                phone_number = request.data.get('phone_number')
+                email = request.data.get('email')
+                
+                if not phone_number or not email:
+                    return Response(
+                        {"error": "Phone number and email are required for new users"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                    
+                # Check if user with this phone number already exists
+                if CustomUser.objects.filter(phone_number=phone_number).exists():
+                    return Response(
+                        {"error": "This phone number is already registered"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Check if user with this email already exists
+                if CustomUser.objects.filter(email=email).exists():
+                    return Response(
+                        {"error": "This email is already registered"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Generate secure password for new user
+                password = generate_secure_password()
+                
+                # Create new user with customer role
+                client_user = CustomUser.objects.create_user(
+                    phone_number=phone_number,
+                    email=email,
+                    role='customer',
+                    password=password  # This will be hashed by create_user
+                )
+                client_user.created_by = user  # Track who created this user
+                client_user.save()
+                
+                # Send email with generated password
+                if email:
+                    message = (
+                        "Hello,\n\nYour account has been created in The Bridge to Legal Help System (BLHS).\n"
+                        f"Your password is: {password}\n\n"
+                        "This is a system-generated password. Please change it after your first login."
+                    )
+                    
+                    # Add information about who created the account
+                    if user.role == 'admin':
+                        message += "\nYour account was created by an administrator."
+                    elif user.role == 'professional':
+                        message += "\nYour account was created by a legal professional."
+                    
+                    send_mail(
+                        subject="Your Account Password",
+                        message=message,
+                        from_email="no-reply@gmail.com",
+                        recipient_list=[email],
+                    )
+            else:
+                # User creating their own profile - check if they already have one
                 existing_client = Client.objects.filter(user=user).first()
                 if existing_client:
                     return Response(
                         {"error": "You already have a client profile"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-            elif submitted_user_id:
-                # Check if the submitted user ID exists and is a customer
-                try:
-                    user = CustomUser.objects.get(id=submitted_user_id, role='customer')
-                    print(f"User ID: {user.id.role}, \n Submitted User ID: {submitted_user_id.role}")
-                    existing_client = Client.objects.filter(user=user).first()
-                    if existing_client:
-                        return Response(
-                            {"error": "This user already has a client profile"},
-                            status=status.HTTP_400_BAD_REQUEST)
-                except CustomUser.DoesNotExist:
-                    return Response(
-                        {"error": "User with this ID does not exist or is not a customer"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
+
             # Validate national ID uniqueness
             national_id = request.data.get('national_id')
             if not national_id:
@@ -85,9 +182,19 @@ def create_client(request):
             # Create serializer instance with data and validate
             serializer = ClientSerializer(data=client_data)
             if serializer.is_valid():
-                # Save the client with the current user
-                serializer.save(user=user)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                # Save the client with the appropriate user (either newly created or current user)
+                serializer.save(user=client_user)
+                
+                response_data = serializer.data
+                if is_creating_new_user:
+                    # Include basic user information in response when admin/professional creates a new user
+                    response_data['user_details'] = {
+                        'phone_number': client_user.phone_number,
+                        'email': client_user.email,
+                        'id': client_user.id
+                    }
+                    
+                return Response(response_data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     except ValidationError as e:
@@ -97,6 +204,9 @@ def create_client(request):
             {"error": f"Failed to create client: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        
+        
+              
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
