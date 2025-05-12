@@ -3,7 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from .models import Feedback
 from .serializers import FeedbackSerializer
-from relocationApp.models import Relocation
+from caseApp.models import Case
+from clientApp.models import Client
+from professionalApp.models import Lawyer
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
@@ -13,10 +16,10 @@ def create_feedback(request):
         data = request.data.copy()
         
         # Validate required fields
-        if 'relocation' not in data:
-            print("Error: Missing required field 'relocation'")
+        if 'case' not in data:
+            print("Error: Missing required field 'case'")
             return Response(
-                {"error": "Missing required field", "message": "Relocation ID is required"}, 
+                {"error": "Missing required field", "message": "case ID is required"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -54,21 +57,21 @@ def create_feedback(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        # Validate relocation exists
+        # Validate case exists
         try:
-            relocation_id = int(data['relocation'])
-            relocation = Relocation.objects.get(id=relocation_id)
-            data['relocation'] = relocation_id
+            case_id = int(data['case'])
+            case = Case.objects.get(id=case_id)
+            data['case'] = case_id
         except (ValueError, TypeError):
-            print(f"Error: Invalid relocation ID '{data['relocation']}', must be an integer")
+            print(f"Error: Invalid case ID '{data['case']}', must be an integer")
             return Response(
-                {"error": "Invalid data", "message": "Relocation ID must be a valid integer"}, 
+                {"error": "Invalid data", "message": "case ID must be a valid integer"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        except Relocation.DoesNotExist:
-            print(f"Error: Relocation with ID {data['relocation']} not found")
+        except case.DoesNotExist:
+            print(f"Error: case with ID {data['case']} not found")
             return Response(
-                {"error": "Not found", "message": f"Relocation with ID {data['relocation']} not found"}, 
+                {"error": "Not found", "message": f"case with ID {data['case']} not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
             
@@ -78,8 +81,8 @@ def create_feedback(request):
         # Create feedback
         serializer = FeedbackSerializer(data=data)
         if serializer.is_valid():
-            serializer.save(created_by=request.user, relocation=relocation)
-            print(f"Success: Feedback created for relocation {relocation_id}")
+            serializer.save(created_by=request.user, case=case)
+            print(f"Success: Feedback created for case {case_id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         print(f"Error: Serializer validation failed - {serializer.errors}")
@@ -200,22 +203,22 @@ def update_feedback(request, feedback_id):
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
-        # Handle relocation ID if present
-        if 'relocation' in data:
+        # Handle case ID if present
+        if 'case' in data:
             try:
-                relocation_id = int(data['relocation'])
-                relocation = Relocation.objects.get(id=relocation_id)
-                data['relocation'] = relocation_id
+                case_id = int(data['case'])
+                case = Case.objects.get(id=case_id)
+                data['case'] = case_id
             except (ValueError, TypeError):
-                print(f"Error: Invalid relocation ID '{data['relocation']}', must be an integer")
+                print(f"Error: Invalid case ID '{data['case']}', must be an integer")
                 return Response(
-                    {"error": "Invalid data", "message": "Relocation ID must be a valid integer"}, 
+                    {"error": "Invalid data", "message": "case ID must be a valid integer"}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            except Relocation.DoesNotExist:
-                print(f"Error: Relocation with ID {data['relocation']} not found")
+            except case.DoesNotExist:
+                print(f"Error: case with ID {data['case']} not found")
                 return Response(
-                    {"error": "Not found", "message": f"Relocation with ID {data['relocation']} not found"}, 
+                    {"error": "Not found", "message": f"case with ID {data['case']} not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
         
@@ -289,6 +292,97 @@ def get_feedbacks_by_logged_in_user(request):
         return Response(serializer.data)
     except Exception as e:
         print(f"Error retrieving user feedbacks: {str(e)}")
+        return Response(
+            {"error": "Server error", "message": f"An unexpected error occurred: {str(e)}"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+        
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_feedbacks_for_client_cases(request):
+    """ 
+    Retrieve all feedbacks for cases associated with the logged-in client 
+    
+    This view does the following:
+    1. Checks if the logged-in user is a client
+    2. Finds all cases associated with the client
+    3. Retrieves all feedbacks for those cases
+    4. Returns the feedbacks as a JSON response
+    """
+    try:
+        # Try to get the client profile for the logged-in user
+        try:
+            client = Client.objects.get(user=request.user)
+        except Client.DoesNotExist:
+            return Response(
+                {"error": "User is not a registered client"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all cases for this client
+        client_cases = Case.objects.filter(client=client)
+        
+        # Retrieve feedbacks for these cases
+        feedbacks = Feedback.objects.filter(case__in=client_cases)
+        
+        # Serialize the feedbacks
+        serializer = FeedbackSerializer(feedbacks, many=True)
+        
+        # Log the number of feedbacks retrieved
+        print(f"Retrieved {len(feedbacks)} feedbacks for client {client.first_name} {client.last_name}")
+        
+        return Response(serializer.data)
+    
+    except Exception as e:
+        # Log any unexpected errors
+        print(f"Error retrieving client case feedbacks: {str(e)}")
+        return Response(
+            {"error": "Server error", "message": f"An unexpected error occurred: {str(e)}"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+        
+        
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_feedbacks_for_lawyer_cases(request):
+    """ 
+    Retrieve all feedbacks for cases associated with the logged-in client 
+    
+    This view does the following:
+    1. Checks if the logged-in user is a client
+    2. Finds all cases associated with the client
+    3. Retrieves all feedbacks for those cases
+    4. Returns the feedbacks as a JSON response
+    """
+    try:
+        # Try to get the client profile for the logged-in user
+        try:
+            lawyer = Lawyer.objects.get(user=request.user)
+        except Lawyer.DoesNotExist:
+            return Response(
+                {"error": "User is not a registered lawyer"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all cases for this client
+        lawyer_cases = Case.objects.filter(lawyer=lawyer)
+        
+        # Retrieve feedbacks for these cases
+        feedbacks = Feedback.objects.filter(case__in=lawyer_cases)
+        
+        # Serialize the feedbacks
+        serializer = FeedbackSerializer(feedbacks, many=True)
+        
+        # Log the number of feedbacks retrieved
+        print(f"Retrieved {len(feedbacks)} feedbacks for lawyer {lawyer.first_name} {lawyer.last_name}")
+        
+        return Response(serializer.data)
+    
+    except Exception as e:
+        # Log any unexpected errors
+        print(f"Error retrieving lawyer case feedbacks: {str(e)}")
         return Response(
             {"error": "Server error", "message": f"An unexpected error occurred: {str(e)}"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -11,6 +11,7 @@ urlpatterns = [
     path('lawyer/', include('professionalApp.urls')),
     path('client/', include('clientApp.urls')),
     path('case/', include('caseApp.urls')),
+    path('feedback/', include('feedbackApp.urls')),
 ]
 
 if settings.DEBUG:

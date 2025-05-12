@@ -5,7 +5,9 @@ from .views import (
     get_feedback_by_id,
     update_feedback,
     delete_feedback,
-    get_feedbacks_by_logged_in_user
+    get_feedbacks_by_logged_in_user,
+    get_feedbacks_for_client_cases,
+    get_feedbacks_for_lawyer_cases,
 )
 
 urlpatterns = [
@@ -15,4 +17,6 @@ urlpatterns = [
     path("update/<int:feedback_id>/", update_feedback, name="update_feedback"),
     path("delete/<int:feedback_id>/", delete_feedback, name="delete_feedback"),
     path("my-feedbacks/", get_feedbacks_by_logged_in_user, name="get_feedbacks_by_logged_in_user"),
+    path('client/', get_feedbacks_for_client_cases, name='get_feedbacks_for_client_cases'),
+    path('lawyer/', get_feedbacks_for_lawyer_cases, name='get_feedbacks_for_lawyer_cases'),
 ]

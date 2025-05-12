@@ -2,12 +2,12 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from datetime import datetime
 from userApp.models import CustomUser
-from relocationApp.models import Relocation
+from caseApp.models import Case
 
 
 class Feedback(models.Model):
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="feedback", null=True, blank=True)
-    relocation = models.ForeignKey(Relocation, on_delete=models.CASCADE, null=True, blank=True)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, null=True, blank=True)
     rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)], help_text="Rating from 1 to 5")
     comment = models.TextField()
     rate = models.IntegerField(default=0)  # Added default value of 0

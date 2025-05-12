@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'professionalApp',
     'clientApp',
     'caseApp',
+    'feedbackApp',
  
    
 ]

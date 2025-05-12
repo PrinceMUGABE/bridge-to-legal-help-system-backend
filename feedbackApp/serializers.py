@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Feedback
 
 from userApp.models import CustomUser
-from relocationApp.serializers import RelocationSerializer
+from caseApp.serializers import CaseSerializer
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,7 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
 class FeedbackSerializer(serializers.ModelSerializer):
     
     created_by = UserSerializer(read_only=True)
-    relocation = RelocationSerializer(read_only=True)
+    relocation = CaseSerializer(read_only=True)
     
     class Meta:
         model = Feedback
