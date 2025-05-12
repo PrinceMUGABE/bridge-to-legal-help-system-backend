@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'speciliarizationApp',
     'professionalApp',
     'clientApp',
+    'caseApp',
  
    
 ]
@@ -55,7 +56,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')], # This line points to the project-level templates directory, consider page being sent in email notification
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -67,6 +68,8 @@ TEMPLATES = [
         },
     },
 ]
+
+
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 

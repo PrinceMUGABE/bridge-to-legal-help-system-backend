@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Notification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #003366;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .case-number {
+            font-weight: bold;
+            color: #003366;
+        }
+        .case-details {
+            margin-top: 20px;
+        }
+        .case-details p {
+            margin: 8px 0;
+        }
+        .label {
+            font-weight: bold;
+            width: 120px;
+            display: inline-block;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Legal Case Notification</h2>
+    </div>
+    <div class="content">
+        <p>This is an automated notification regarding the following legal case:</p>
+        
+        <div class="case-details">
+            <p><span class="label">Case Number:</span> <span class="case-number">{{ case_number }}</span></p>
+            <p><span class="label">Title:</span> {{ title }}</p>
+            <p><span class="label">Status:</span> {{ status|title }}</p>
+            <p><span class="label">Client:</span> {{ client_name }}</p>
+            <p><span class="label">Lawyer:</span> {{ lawyer_name }}</p>
+            
+            <h3>Description:</h3>
+            <p>{{ description }}</p>
+        </div>
+        
+        <p>Please log in to the system for more details and to take appropriate action.</p>
+    </div>
+    <div class="footer">
+        <p>This is an automated message. Please do not reply to this email.</p>
+        <p>© Legal Case Management System</p>
+    </div>
+</body>
+</html>
