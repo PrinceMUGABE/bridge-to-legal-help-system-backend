@@ -19,6 +19,7 @@ from .serializers import (
 )
 
 
+
 def send_case_notification(case):
     """Helper function to send email notifications about a case"""
     # Get all recipients
@@ -55,8 +56,11 @@ def send_case_notification(case):
         context['lawyer_name'] = f"{case.lawyer.first_name} {case.lawyer.last_name}"
     else:
         context['lawyer_name'] = "Not assigned yet"
-        
-    html_message = render_to_string('case_notification_email.html', context)
+    
+    # Use the correct template path
+    template_path = 'caseApp/case_notification_email.html'
+    
+    html_message = render_to_string(template_path, context)
     plain_message = f"""
     Case Number: {case.case_number}
     Title: {case.title}
@@ -80,7 +84,6 @@ def send_case_notification(case):
     except Exception as e:
         print(f"Email sending failed: {str(e)}")
         return False
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -237,29 +240,6 @@ def get_case_by_id(request, case_id):
         )
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_all_cases(request):
-    """Get all cases (admin only)"""
-    user = request.user
-    
-    # Only admins can view all cases
-    if user.role != 'admin':
-        return Response(
-            {"error": "Only admins can view all cases."},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
-    try:
-        cases = Case.objects.all()
-        serializer = CaseSerializer(cases, many=True)
-        return Response(serializer.data)
-    
-    except Exception as e:
-        return Response(
-            {"error": f"An error occurred: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
 @api_view(['GET'])
@@ -348,6 +328,33 @@ def get_lawyer_cases(request):
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_cases(request):
+    """Get all cases (admin only)"""
+    user = request.user
+    
+    # Only admins can view all cases
+    if user.role != 'admin':
+        return Response(
+            {"error": "Only admins can view all cases."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        cases = Case.objects.all()
+        serializer = CaseSerializer(cases, many=True)
+        return Response(serializer.data)
+    
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 
 @api_view(['GET'])
@@ -558,3 +565,10 @@ def update_case_status(request, case_id):
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        
+        
+        
+        
+        
+        
+        

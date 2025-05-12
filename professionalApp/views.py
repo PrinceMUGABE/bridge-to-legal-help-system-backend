@@ -686,3 +686,46 @@ def get_lawyers_by_residence(request):
             'message': 'An unexpected error occurred',
             'errors': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
+        
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_all_lawyers_by_specialization(request, id):
+    """
+    Get all lawyers filtered by specialization
+    """
+    # Get specialization ID from request data
+    # specialization_id = request.data.get("specialization")
+    
+    if not id:
+        return Response({
+            'status': 'error',
+            'message': 'Specialization ID is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        # Filter lawyers that have the specified specialization
+        lawyers = Lawyer.objects.filter(
+            specializations__id=id,
+            status='accepted',  # Only return accepted lawyers
+            availability_status='active'  # Only return active lawyers
+        ).distinct()
+        
+        # Use the serializer to format the data
+        serializer = LawyerSerializer(lawyers, many=True)
+        
+        return Response({
+            'status': 'success',
+            'count': len(serializer.data),
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': 'An unexpected error occurred',
+            'errors': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

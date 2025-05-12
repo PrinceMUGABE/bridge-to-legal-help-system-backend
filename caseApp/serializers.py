@@ -46,11 +46,31 @@ class LawyerSerializer(serializers.ModelSerializer):
     
     
     
+    # Fields for computed values used in list view
+    user_phone = serializers.SerializerMethodField(read_only=True)
+    full_name = serializers.SerializerMethodField(read_only=True)
+
+    
+    class Meta:
+        model = Lawyer
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
+    
+    def get_user_phone(self, obj):
+        return obj.user.phone_number if obj.user else None
+    
+
+    
+    def get_full_name(self, obj):
+        middle = f" {obj.middle_name}" if obj.middle_name else ""
+        return f"{obj.first_name}{middle} {obj.last_name}"
+    
+            
     
 class CaseSerializer(serializers.ModelSerializer):
     client = ClientSerializer(read_only=True)
     lawyer = LawyerSerializer(read_only=True)
-    Specialization = SpecializationSerializer(read_only=True)
+    specialization = SpecializationSerializer(read_only=True)
     class Meta:
         model = Case
         fields = [

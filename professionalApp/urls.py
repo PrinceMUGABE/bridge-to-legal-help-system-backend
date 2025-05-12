@@ -21,4 +21,5 @@ urlpatterns = [
     
     # Get lawyer info for the logged-in user
     path('user/', views.get_logged_in_lawyer_info, name='get_logged_in_lawyer_info'),
+    path('specialization/<int:id>/', views.get_all_lawyers_by_specialization, name='get_all_lawyers_by_specialization'),
 ]
