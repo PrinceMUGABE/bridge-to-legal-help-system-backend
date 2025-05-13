@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import transaction
 from django.template.loader import render_to_string
 
+
 from caseApp.models import Case
 from clientApp.models import Client
 from professionalApp.models import Lawyer
@@ -15,7 +16,8 @@ from .serializers import (
     CaseSerializer, 
     CaseCreateSerializer, 
     CaseUpdateSerializer,
-    CaseStatusUpdateSerializer
+    CaseStatusUpdateSerializer,
+    ClientSerializer
 )
 
 
@@ -92,7 +94,7 @@ def create_case(request):
     user = request.user
     
     # Only customers can create cases for themselves
-    if user.role != 'customer':
+    if user.role != 'customer' :
         return Response(
             {"error": "Only clients can create cases for themselves."},
             status=status.HTTP_403_FORBIDDEN
@@ -186,7 +188,66 @@ def admin_create_case(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def lawyer_create_case(request):
+    """Create a case as a lawyer, assigning it to a specific client"""
+    user = request.user
+    
+    # Only lawyers can use this endpoint
+    if user.role != 'lawyer':
+        return Response(
+            {"error": "Only lawyers can create cases."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        # Get the lawyer profile for the current user
+        try:
+            lawyer = Lawyer.objects.get(user=user)
+        except Lawyer.DoesNotExist:
+            return Response(
+                {"error": "Lawyer profile not found."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Validate required fields
+        if 'client' not in request.data:
+            return Response(
+                {"error": "Client is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Create a mutable copy of the request data
+        data = request.data.copy()
+        # Automatically assign the current lawyer to the case
+        data['lawyer'] = lawyer.id
+        
+        serializer = CaseCreateSerializer(data=data)
+        if serializer.is_valid():
+            with transaction.atomic():
+                case = serializer.save()
+                
+                # Set initial status since we're assigning a lawyer
+                case.status = 'assigned'
+                case.save()
+                
+                # Send notification emails (implement this function as needed)
+                send_case_notification(case)
+                
+                # Return the created case
+                response_serializer = CaseSerializer(case)
+                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+        
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_case_by_id(request, case_id):
@@ -240,6 +301,49 @@ def get_case_by_id(request, case_id):
         )
 
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def lawyer_partner_clients(request):
+    """
+    Get all clients that have cases assigned to the current lawyer
+    """
+    user = request.user
+    
+    # Only lawyers can access this endpoint
+    if user.role != 'lawyer':
+        return Response(
+            {"error": "Only lawyers can access partner clients."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        # Get the lawyer profile for the current user
+        try:
+            lawyer = Lawyer.objects.get(user=user)
+        except Lawyer.DoesNotExist:
+            return Response(
+                {"error": "Lawyer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get all unique clients who have cases with this lawyer
+        clients = Client.objects.filter(
+            cases__lawyer=lawyer
+        ).distinct()
+        
+        serializer = ClientSerializer(clients, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+        
+        
+        
 
 
 @api_view(['GET'])

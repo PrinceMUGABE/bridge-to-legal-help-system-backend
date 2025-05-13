@@ -7,6 +7,7 @@ urlpatterns = [
     # Case creation endpoints
     path('create/', views.create_case, name='create_case'),  # For clients to create their own cases
     path('admin/create/', views.admin_create_case, name='admin_create_case'),  # For admins to create cases
+    path('lawyer/create/', views.lawyer_create_case, name='lawyer_create_case'),  # For lawyers to create cases
     
     # Case retrieval endpoints
     path('<int:case_id>/', views.get_case_by_id, name='get_case_by_id'),  # Get a specific case
@@ -22,4 +23,5 @@ urlpatterns = [
     
     # Case deletion endpoint
     path('delete/<int:case_id>/', views.delete_case, name='delete_case'),  # Delete a case (admin only)
+    path('lawyer/partner-clients/', views.lawyer_partner_clients, name='lawyer-partner-clients'),
 ]

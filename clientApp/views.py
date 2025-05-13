@@ -85,14 +85,14 @@ def create_client(request):
                 )
                 
             # Check if user has appropriate role
-            if user.role not in ['customer', 'admin', 'professional']:
+            if user.role not in ['customer', 'admin', 'lawyer']:
                 return Response(
                     {"error": "Only users with 'admin', 'customer', or 'professional' role can create a client profile"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             # Initialize variable to track if admin or professional is creating a new user
-            is_creating_new_user = user.role in ['admin', 'professional']
+            is_creating_new_user = user.role in ['admin', 'lawyer']
             client_user = user  # Default: user creating their own profile
             
             # Admin or Professional creating a new user case

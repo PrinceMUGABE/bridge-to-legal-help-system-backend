@@ -729,3 +729,152 @@ def get_all_lawyers_by_specialization(request, id):
             'message': 'An unexpected error occurred',
             'errors': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+
+from userApp.models import CustomUser
+from .models import Lawyer
+from .serializers import LawyerSerializer, UserSerializer
+
+
+class IsLawyer(IsAuthenticated):
+    """
+    Permission class to check if the authenticated user has the 'lawyer' role
+    """
+    def has_permission(self, request, view):
+        is_authenticated = super().has_permission(request, view)
+        return is_authenticated and request.user.role == 'lawyer'
+
+
+@api_view(['GET'])
+@permission_classes([IsLawyer])
+def get_lawyer_profile(request):
+    """
+    Get the profile of the currently logged in lawyer including user details and specializations
+    """
+    try:
+        # Get the lawyer profile for the authenticated user
+        lawyer_profile = get_object_or_404(Lawyer, user=request.user)
+        
+        # Serialize the data
+        serializer = LawyerSerializer(lawyer_profile)
+        
+        return Response({
+            'success': True,
+            'message': 'Lawyer profile retrieved successfully',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e),
+            'data': None
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT'])
+@permission_classes([IsLawyer])
+def update_lawyer_profile(request):
+    """
+    Update the lawyer profile and associated user details
+    """
+    try:
+        # Get the user and lawyer profile
+        user = request.user
+        lawyer_profile = get_object_or_404(Lawyer, user=user)
+        
+        # Extract data that belongs to the user model
+        user_data = {}
+        if 'email' in request.data:
+            user_data['email'] = request.data.get('email')
+        if 'phone_number' in request.data:
+            user_data['phone_number'] = request.data.get('phone_number')
+        
+        # Extract specializations data if provided
+        specialization_ids = request.data.pop('specializations', None)
+        
+        # Create a copy of the data for lawyer update
+        lawyer_data = request.data.copy()
+        
+        # Perform validation
+        errors = {}
+        
+        # Validate user data if any
+        if user_data:
+            user_serializer = UserSerializer(user, data=user_data, partial=True)
+            if not user_serializer.is_valid():
+                errors['user'] = user_serializer.errors
+        
+        # Validate lawyer data
+        lawyer_serializer = LawyerSerializer(lawyer_profile, data=lawyer_data, partial=True)
+        if not lawyer_serializer.is_valid():
+            errors['lawyer'] = lawyer_serializer.errors
+        
+        if errors:
+            return Response({
+                'success': False,
+                'message': 'Validation failed',
+                'errors': errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # If everything is valid, perform the update within a transaction
+        with transaction.atomic():
+            # Update user if there's user data
+            if user_data:
+                user_serializer.save()
+            
+            # Update lawyer profile
+            lawyer = lawyer_serializer.save()
+            
+            # Update specializations if provided
+            if specialization_ids is not None:
+                lawyer.specializations.clear()
+                lawyer.specializations.add(*specialization_ids)
+        
+        # Get the updated lawyer profile
+        updated_lawyer = get_object_or_404(Lawyer, user=user)
+        serializer = LawyerSerializer(updated_lawyer)
+        
+        return Response({
+            'success': True,
+            'message': 'Profile updated successfully',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e),
+            'data': None
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
