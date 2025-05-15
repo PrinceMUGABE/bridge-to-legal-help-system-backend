@@ -93,8 +93,11 @@ def create_case(request):
     """Create a new case for the logged-in client"""
     user = request.user
     
+    print(f"Submitted user creating case {user.id}")
+    
     # Only customers can create cases for themselves
-    if user.role != 'customer' :
+    if user.role != 'customer':
+        print("Only clients can create cases for themselves.")
         return Response(
             {"error": "Only clients can create cases for themselves."},
             status=status.HTTP_403_FORBIDDEN
@@ -106,20 +109,26 @@ def create_case(request):
         
         # Check if client is active
         if client.status != 'active':
+            print("Only active clients can create cases.")
             return Response(
                 {"error": "Only active clients can create cases."},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Add client to the request data
+        # Create serializer and validate
         data = request.data.copy()
         data['client'] = client.id
-        
-        # Create serializer and validate
+
         serializer = CaseCreateSerializer(data=data)
         if serializer.is_valid():
             with transaction.atomic():
+                # Fix: Pass client instance directly during save instead of through data
                 case = serializer.save()
+                
+                # Set initial status
+                if 'lawyer' in request.data and request.data['lawyer']:
+                    case.status = 'pending'
+                    case.save()
                 
                 # Send notification emails
                 send_case_notification(case)
@@ -131,16 +140,21 @@ def create_case(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     except Client.DoesNotExist:
+        print("Client profile not found for this user.")
         return Response(
             {"error": "Client profile not found for this user."},
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
+    
+        print(f"Error creating case: {str(e)}")     
         return Response(
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
+        
+        
+        
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -187,6 +201,7 @@ def admin_create_case(request):
             {"error": f"An error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

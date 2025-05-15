@@ -35,6 +35,7 @@ from django.contrib.auth.hashers import check_password
 from django.shortcuts import get_object_or_404
 import random
 import string
+from .serializers import ClientProfileUpdateSerializer
 
 def generate_secure_password():
     """Generate a secure random password that meets complexity requirements."""
@@ -280,29 +281,6 @@ def get_client_by_id(request, client_id):
         )
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_clients_created_by_user(request):
-    """
-    Get all clients created by the logged-in user
-    """
-    try:
-        clients = Client.objects.filter(created_by=request.user)
-        
-        if not clients:
-            return Response(
-                {"message": "You don't have client profile"},
-                status=status.HTTP_200_OK
-            )
-            
-        serializer = ClientSerializer(clients, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        return Response(
-            {"error": f"Failed to retrieve clients: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
 @api_view(['PUT', 'PATCH'])
@@ -381,3 +359,88 @@ def delete_client(request, client_id):
             {"error": f"Failed to delete client: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        
+        
+        
+        
+        
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_clients_created_by_user(request):
+    """
+    Get all clients created by the logged-in user
+    """
+    try:
+        clients = Client.objects.filter(user=request.user)
+        
+        if not clients:
+            return Response(
+                {"message": "You don't have client profile"},
+                status=status.HTTP_200_OK
+            )
+            
+        serializer = ClientSerializer(clients, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to retrieve clients: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_client_profile(request):
+    """
+    Update both CustomUser and Client profiles for the logged-in user
+    """
+    try:
+        # Get the user and their client profile
+        user = request.user
+        try:
+            client = Client.objects.get(user=user)
+        except Client.DoesNotExist:
+            return Response(
+                {"error": "Client profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Validate and process the data
+        serializer = ClientProfileUpdateSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update CustomUser fields
+        if 'email' in serializer.validated_data:
+            user.email = serializer.validated_data['email']
+            user.save()
+        
+        # Update Client fields
+        client_fields = [
+            'first_name', 'middle_name', 'last_name', 'gender', 
+            'date_of_birth', 'marital_status', 'province', 'district',
+            'sector', 'cell', 'village', 'education_level', 'national_id'
+        ]
+        
+        for field in client_fields:
+            if field in serializer.validated_data:
+                setattr(client, field, serializer.validated_data[field])
+        
+        client.save()
+        
+        return Response(
+            {"message": "Profile updated successfully"},
+            status=status.HTTP_200_OK
+        )
+        
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to update profile: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+        
+        
+        
+        
