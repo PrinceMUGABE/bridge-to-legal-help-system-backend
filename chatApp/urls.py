@@ -21,4 +21,8 @@ urlpatterns = [
     
     # Stats
     path('stats/', views.chat_stats, name='chat-stats'),
+    path('rooms/case/<int:case_id>/', views.get_chat_room_by_case, name='get-chat-room-by-case'),
+    
+    path('rooms/<int:chat_room_id>/mark-read/', views.mark_chat_room_read, name='mark-chat-room-read'),
+    path('messages/<int:message_id>/mark-read/', views.mark_message_read, name='mark-message-read'),
 ]

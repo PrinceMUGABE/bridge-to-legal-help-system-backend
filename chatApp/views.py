@@ -1,4 +1,5 @@
 # chatApp/views.py
+from urllib import request
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
@@ -8,6 +9,7 @@ from django.utils.timezone import now
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
+
 from .models import ChatRoom, Message, ChatNotification
 from .serializers import (
     ChatRoomSerializer, MessageSerializer, MessageCreateSerializer,
@@ -16,6 +18,7 @@ from .serializers import (
 from caseApp.models import Case
 from clientApp.models import Client
 from professionalApp.models import Lawyer
+from rest_framework.exceptions import PermissionDenied
 
 
 class ChatRoomListView(generics.ListAPIView):
@@ -91,32 +94,30 @@ class MessageListView(generics.ListAPIView):
 
 
 class MessageCreateView(generics.CreateAPIView):
-    """Create a new message in a chat room"""
     serializer_class = MessageCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
-    def perform_create(self, serializer):
+
+    def get_serializer_context(self):
+        """Add chat_room to serializer context"""
+        context = super().get_serializer_context()
         chat_room_id = self.kwargs.get('chat_room_id')
-        chat_room = get_object_or_404(ChatRoom, id=chat_room_id)
-        
-        # Check if user has access to this chat room
+        context['chat_room'] = get_object_or_404(ChatRoom, id=chat_room_id)
+        return context
+
+    def perform_create(self, serializer):
+        chat_room = serializer.context['chat_room']
         user = self.request.user
+
+        # Check if user has access to this chat room
         if user.role == 'customer':
             client = get_object_or_404(Client, user=user)
             if chat_room.client != client:
-                return Response(
-                    {'error': 'Access denied'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
+                raise PermissionDenied("You don't have access to this chat room")
         elif user.role == 'lawyer':
             lawyer = get_object_or_404(Lawyer, user=user)
             if chat_room.lawyer != lawyer:
-                return Response(
-                    {'error': 'Access denied'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
+                raise PermissionDenied("You don't have access to this chat room")
         
-        # Save the message
         message = serializer.save()
         
         # Send real-time notification via WebSocket
@@ -139,7 +140,6 @@ class MessageCreateView(generics.CreateAPIView):
             title=f'New message in case {chat_room.case.case_number}',
             message=f'{user.phone_number} sent you a message'
         )
-
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -260,3 +260,56 @@ def chat_stats(request):
         'unread_messages': unread_messages,
         'unread_notifications': unread_notifications
     })
+    
+    
+    
+    
+# chatApp/views.py
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_chat_room_by_case(request, case_id):
+    """Get chat room by case ID"""
+    chat_room = get_object_or_404(ChatRoom, case_id=case_id)
+    
+    # Check if user has access to this chat room
+    user = request.user
+    if user.role == 'customer':
+        client = get_object_or_404(Client, user=user)
+        if chat_room.client != client:
+            return Response(
+                {'error': 'Access denied'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+    elif user.role == 'lawyer':
+        lawyer = get_object_or_404(Lawyer, user=user)
+        if chat_room.lawyer != lawyer:
+            return Response(
+                {'error': 'Access denied'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+    
+    serializer = ChatRoomSerializer(chat_room, context={'request': request})
+    return Response(serializer.data)
+
+
+
+# chatApp/views.py
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from .models import ChatRoom, Message
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def mark_chat_room_read(request, chat_room_id):
+    chat_room = get_object_or_404(ChatRoom, id=chat_room_id)
+    # Mark all messages as read logic here
+    return Response({'status': 'success'})
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def mark_message_read(request, message_id):
+    message = get_object_or_404(Message, id=message_id)
+    message.mark_as_read()
+    return Response({'status': 'success'})

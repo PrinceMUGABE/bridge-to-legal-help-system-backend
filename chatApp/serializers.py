@@ -52,7 +52,10 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         fields = ['message_type', 'content', 'attachment']
     
     def create(self, validated_data):
-        chat_room = self.context['chat_room']
+        chat_room = self.context.get('chat_room')
+        if not chat_room:
+            raise serializers.ValidationError("Chat room not found in context")
+            
         sender = self.context['request'].user
         
         message = Message.objects.create(
@@ -66,7 +69,6 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         chat_room.save(update_fields=['updated_at'])
         
         return message
-
 
 class ChatRoomSerializer(serializers.ModelSerializer):
     case_title = serializers.CharField(source='case.title', read_only=True)

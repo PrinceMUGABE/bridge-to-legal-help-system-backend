@@ -2,7 +2,7 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
-
+from django.core.management.commands.runserver import Command as Runserver
 
 def main():
     """Run administrative tasks."""
@@ -15,8 +15,14 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
+    
+    # Use daphne for ASGI when running the development server
+    if len(sys.argv) > 1 and sys.argv[1] == 'runserver':
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
+        Runserver.default_addr = '0.0.0.0'
+        Runserver.default_port = '8000'
+    
     execute_from_command_line(sys.argv)
-
 
 if __name__ == '__main__':
     main()
