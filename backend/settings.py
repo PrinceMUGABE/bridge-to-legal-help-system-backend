@@ -22,6 +22,7 @@ ALLOWED_HOSTS = []
 # Application definition
 INSTALLED_APPS = [
     'corsheaders',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -36,6 +37,7 @@ INSTALLED_APPS = [
     'clientApp',
     'caseApp',
     'feedbackApp',
+    'chatApp',
  
    
 ]
@@ -73,6 +75,15 @@ TEMPLATES = [
 
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 
 # Database
@@ -179,3 +190,6 @@ SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 
 
 JWT_SECRET_KEY = SECRET_KEY
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
