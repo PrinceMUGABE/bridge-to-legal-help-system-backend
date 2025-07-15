@@ -25,4 +25,7 @@ urlpatterns = [
     
     path('rooms/<int:chat_room_id>/mark-read/', views.mark_chat_room_read, name='mark-chat-room-read'),
     path('messages/<int:message_id>/mark-read/', views.mark_message_read, name='mark-message-read'),
+    
+    
+    path('ice-servers/', views.get_stream_token, name='stream-token'),
 ]

@@ -7,6 +7,11 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# Stream Chat Configuration
+STREAM_API_KEY = '3g56x4hpaaf3'
+STREAM_API_SECRET = 'dyea9q22g5qyz5cs7wka8vwpzqbabvghx5b5w4ujrqufzz6hfv9dcjnmyrttepz9'
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 

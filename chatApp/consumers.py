@@ -65,25 +65,74 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
-            message = data['message']
             
-            # Send message to room group
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'message': message,
-                    'sender_id': self.scope['user'].id
-                }
-            )
+            # Handle different message types
+            if data.get('type') == 'chat_message':
+                message = data['message']
+                
+                # Send message to room group
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': message,
+                        'sender_id': self.scope['user'].id
+                    }
+                )
+            elif data.get('type') == 'video_call_offer':
+                # Forward video call offer to the room group
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'video_call_offer',
+                        'chat_room_id': data.get('chat_room_id'),
+                        'caller_id': data.get('caller_id')
+                    }
+                )
+            elif data.get('type') == 'typing':
+                # Handle typing notifications
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'typing_status',
+                        'user_id': self.scope['user'].id,
+                        'is_typing': data.get('is_typing')
+                    }
+                )
+            elif data.get('type') == 'join':
+                # Handle user joining
+                pass  # You might want to handle this case
+            
         except json.JSONDecodeError:
             pass
 
+    # Handler for chat messages
     async def chat_message(self, event):
-        # Send message to WebSocket
+        """Send message to WebSocket"""
         await self.send(text_data=json.dumps({
+            'type': 'chat_message',
             'message': event['message'],
             'sender_id': event['sender_id']
+        }))
+
+    # Handler for video call offers
+    async def video_call_offer(self, event):
+        """Send video call offer to WebSocket"""
+        await self.send(text_data=json.dumps({
+            'type': 'video_call_offer',
+            'chat_room_id': event['chat_room_id'],
+            'caller_id': event['caller_id'],
+            'caller_name': event.get('caller_name', 'User'),
+            'call_type': event.get('call_type', 'video')  # Add call type
+        }))
+
+    # Handler for typing status
+    async def typing_status(self, event):
+        """Send typing status to WebSocket"""
+        await self.send(text_data=json.dumps({
+            'type': 'typing_status',
+            'user_id': event['user_id'],
+            'is_typing': event['is_typing']
         }))
 
 

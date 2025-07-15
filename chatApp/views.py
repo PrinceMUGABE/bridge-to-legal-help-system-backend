@@ -313,3 +313,36 @@ def mark_message_read(request, message_id):
     message = get_object_or_404(Message, id=message_id)
     message.mark_as_read()
     return Response({'status': 'success'})
+
+
+
+
+
+
+# views.py
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.conf import settings
+import jwt
+import datetime
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_stream_token(request):
+    try:
+        # Generate JWT token with user ID in the correct format
+        payload = {
+            'user_id': str(request.user.id),  # Must be string
+            'iat': datetime.datetime.utcnow(),
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+        }
+        
+        token = jwt.encode(payload, settings.STREAM_API_SECRET, algorithm='HS256')
+        
+        return Response({
+            'token': token,
+            'api_key': settings.STREAM_API_KEY,
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
