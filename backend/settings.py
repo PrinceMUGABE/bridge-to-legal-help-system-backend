@@ -44,6 +44,9 @@ INSTALLED_APPS = [
     'caseApp',
     'feedbackApp',
     'chatApp',
+    'articleApp',
+    'faq',
+    'templateApp',
  
    
 ]
@@ -169,6 +172,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
 }
 
 
@@ -200,5 +206,11 @@ SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 
 JWT_SECRET_KEY = SECRET_KEY
 
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Allowed file extensions for template uploads
+ALLOWED_TEMPLATE_EXTENSIONS = ['.pdf', '.docx', '.doc']
+MAX_TEMPLATE_FILE_SIZE = 5 * 1024 * 1024  # 5MB

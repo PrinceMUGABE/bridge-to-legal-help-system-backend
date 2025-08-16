@@ -13,6 +13,9 @@ urlpatterns = [
     path('case/', include('caseApp.urls')),
     path('feedback/', include('feedbackApp.urls')),
     path('chat/', include('chatApp.urls')),
+    path('articles/', include('articleApp.urls')),
+    path('faq/', include('faq.urls')),
+    path('templates/', include('templateApp.urls')),
 ]
 
 if settings.DEBUG:
