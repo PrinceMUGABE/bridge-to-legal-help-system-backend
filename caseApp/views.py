@@ -93,7 +93,7 @@ def create_case(request):
     """Create a new case for the logged-in client"""
     user = request.user
     
-    print(f"Submitted user creating case {user.id}")
+    print(f"Submitted user creating case {user.id}, {user.email}")
     
     # Only customers can create cases for themselves
     if user.role != 'customer':

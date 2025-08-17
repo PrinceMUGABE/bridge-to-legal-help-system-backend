@@ -123,7 +123,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'chat_room_id': event['chat_room_id'],
             'caller_id': event['caller_id'],
             'caller_name': event.get('caller_name', 'User'),
-            'call_type': event.get('call_type', 'video')  # Add call type
+            'call_type': event.get('call_type', 'video'),
+            'offer': {
+                'type': event.get('offer', {}).get('type', 'offer'),
+                'sdp': event.get('offer', {}).get('sdp', '')
+            }
         }))
 
     # Handler for typing status
